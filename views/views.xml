@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <!--
+       Inserta el campo `agrupar` (sale.order.line) en las sub-vistas INLINE
+       que están definidas dentro de la vista principal de sale.order.
+     - En el sub-form de línea: después de price_unit, visible sólo para líneas reales (no sección/nota).
+     - En el tree (grilla): columna después de product_id, ocultable y sólo para líneas reales.
+     - En el kanban móvil: expone el campo y lo muestra en la tarjeta.
+  -->
+  <record id="sale_order_form_inherit_agrupar" model="ir.ui.view">
+    <field name="name">sale.order.form.inherit.agrupar</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+
+
+      <!-- Sub-TREE (grilla) de la línea (contexto sale.order.line) -->
+      <xpath expr="//page[@name='order_lines']//field[@name='order_line']/tree//field[@name='product_uom_qty']"
+             position="after">
+        <!-- columna opcional y oculta para secciones/notas -->
+        <field name="agrupar" string="Agrupar Tareas" optional="show"/>
+      </xpath>
+
+      <!-- Insertar después de la descripción de la línea -->
+      <xpath expr="//page[@name='order_lines']//field[@name='order_line']/tree//field[@name='product_uom_qty']"
+             position="after">
+        <field name="fsm_order_ids" invisible="display_type"/>
+      </xpath>
+    </field>
+  </record>
+  
+  <!-- Botón de acción en header -->
+  <record id="sale_order_form_inherit_create_fsm_btn" model="ir.ui.view">
+    <field name="name">sale.order.form.inherit.create.fsm.button</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//form/header" position="inside">
+        <button name="action_create_fsm_orders"
+                type="object"
+                string="Crear órdenes FSM"
+                class="btn-secondary"
+                invisible="state in ['cancel']"/>
+      </xpath>
+    </field>
+  </record>
+</odoo>
