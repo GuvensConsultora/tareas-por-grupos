@@ -2,20 +2,20 @@
 {
     'name': "geotek",
 
-    'summary': "Short (1 phrase/line) summary of the module's purpose",
+    'summary': "Creación de tares para asociarles los productos",
 
     'description': """
-Long description of module's purpose
+Seleccionamos las diferentes lineas en los pptos de ventas mediante grupos para que las tareas se generen por grupos y no por productos.
     """,
 
-    'author': "My Company",
+    'author': "Guvens",
     'website': "https://www.yourcompany.com",
 
     # Categories can be used to filter modules in modules listing
     # Check https://github.com/odoo/odoo/blob/15.0/odoo/addons/base/data/ir_module_category_data.xml
     # for the full list
-    'category': 'Uncategorized',
-    'version': '0.1',
+    'category': 'Sale',
+    'version': '18.0.1.0.0',
 
     # any module necessary for this one to work correctly
     'depends': ['sale'],
