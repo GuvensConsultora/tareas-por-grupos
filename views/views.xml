@@ -15,8 +15,9 @@
 
 
       <!-- Sub-TREE (grilla) de la línea (contexto sale.order.line) -->
-      <xpath expr="//page[@name='order_lines']//field[@name='order_line']/tree//field[@name='product_uom_qty']"
-             position="after">
+      <xpath expr="//field[@name='order_line']//*[self::tree or self::list]//field[@name='product_uom_qty']" position="after">
+       
+      <!-- <xpath expr="//page[@name='order_lines']//field[@name='order_line']/tree//field[@name='product_uom_qty']" position="after"> -->
         <!-- columna opcional y oculta para secciones/notas -->
         <field name="agrupar" string="Agrupar Tareas" optional="show"/>
       </xpath>
