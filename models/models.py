@@ -65,7 +65,9 @@ class SaleOrder(models.Model):
                         # Crear la tarea
                         vals = {
                             "name": name_prefix,
+                            "proyect_id": 2,
                             "partner_id": order.partner_id.id,
+                            "sale_order_id":order.id,
                             "description": f"Tarea generada desde {order._name} {order.name}",
                             # opcional: asignar responsable
                             # "user_id": order.user_id.id,
