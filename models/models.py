@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields
+import logging
+_logger = logging.getLogger(__name__)
+
 
 class SaleOrderLine(models.Model):
     _inherit = 'sale.order.line'
@@ -15,88 +18,63 @@ class SaleOrderLine(models.Model):
         required=False,
     )
 
-    fsm_order_ids = fields.One2many(
-        comodel_name='fsm.order',
-        inverse_name='sale_order_line_id',
-        string='Órdenes FSM'
-    )
-class FSMOrder(models.Model):
-    _inherit = 'fsm.order'  # requiere el módulo de Field Service instalado
+    task_id = fields.Many2one(
+        "project.task",
+        string="Tarea relacionada",
+        domain=[],
 
-    sale_order_line_id = fields.Many2one(
-        comodel_name='sale.order.line',
-        string='Línea de venta',
-        ondelete='set null',
-        index=True,
-        copy=False,
-    )
+        help="Vinculá una tarea a esta línea de venta."
+     )
 
-    # (Opcional) atajo al pedido para búsquedas/acciones
-    sale_order_id = fields.Many2one(
-        related='sale_order_line_id.order_id',
-        string='Pedido de venta',
-        store=True,
-        readonly=True,
-        index=True,
-    )
 
 class SaleOrder(models.Model):
-    _inherit = 'sale.order'
+    _inherit = "sale.order"
 
-    def action_create_fsm_orders(self):
-        """Crea una fsm.order por cada línea elegible que no tenga aún."""
-        self.ensure_one()
-        Fsm = self.env['fsm.order']
-        created = Fsm.browse()
+    def action_generate_group_tasks(self):
 
-        for line in self.order_line:
-            # saltar secciones/notas
-            if line.display_type:
-                continue
-            # (opcional) limitar a productos de tipo servicio
-            if line.product_id and line.product_id.type != 'service':
-                continue
-            # evitar duplicados por línea
-            if line.fsm_order_ids:
-                continue
+        """Genera/asigna una tarea por cada grupo (x_project_id) en las líneas sin tarea."""
+        Task = self.env["project.task"]
+        for order in self:
+            # cache local para no buscar/crear repetido en la misma ejecución
+            cache_task_by_group = {}
 
-            vals = {
-                'customer_id': self.partner_id.id,   # cliente
-                'company_id': self.company_id.id,
-                'sale_order_line_id': line.id,
-                'name': f"{self.name or 'SO'} - {line.product_id.display_name or line.name}",
-            }
-            # si FSM tiene estos campos, seteamos fechas desde la orden
-            if 'scheduled_date_start' in Fsm._fields and self.commitment_date:
-                vals['scheduled_date_start'] = self.commitment_date
-            if 'scheduled_date_end' in Fsm._fields and self.commitment_date:
-                vals['scheduled_date_end'] = self.commitment_date
+            # Tomamos solo líneas “reales”
+            solines = order.order_line.filtered(lambda l: not l.display_type)
+            _logger.info("[TASKGEN] Líneas reales a procesar: %s", [l.id for l in solines])
 
-            created |= Fsm.create(vals)
+            for line in solines:
+                _logger.info("LINEA: %s, GRUPO: %s, TAREA: %s", line.id, line.agrupar, line.task_id)
+                # Si ya tiene tarea o no tiene grupo → saltar
+                if line.task_id or not line.agrupar:
+                    continue
 
-        if created:
-            # log en el chatter
-            self.message_post(
-                body=f"Se crearon {len(created)} órdenes FSM: " +
-                ", ".join(created.mapped('name'))
-            )
-            # abrir las recién creadas
-            return {
-                'name': 'Órdenes FSM creadas',
-                'type': 'ir.actions.act_window',
-                'res_model': 'fsm.order',
-                'view_mode': 'tree,form,kanban',
-                'domain': [('id', 'in', created.ids)],
-                'target': 'current',
-            }
-        # notificación si no se creó nada
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': 'Nada para crear',
-                'message': 'No hay líneas elegibles (ya tienen orden, son secciones/notas o no son servicios).',
-                'type': 'warning',
-                'sticky': False,
-            }
-        }
+                group = line.agrupar
+                task = cache_task_by_group.get(group)
+
+                if not task:
+                    # Intentar reutilizar una tarea existente de este pedido y grupo
+                    # Estrategia: buscar por (project_id == grupo) y nombre que empiece con el nombre del pedido.
+                    # Podés refinar el dominio si preferís otro identificador.
+                    name_prefix = f"{order.name} - {order.partner_id.name} - {line.agrupar}"
+                    task = Task.search([
+                        ("project_id", "=", group),
+                        ("name", "=", name_prefix),
+                    ], limit=1)
+
+                    if not task:
+                        # Crear la tarea
+                        vals = {
+                            "name": name_prefix,
+                            "partner_id": order.partner_id.id,
+                            "description": f"Tarea generada desde {order._name} {order.name}",
+                            # opcional: asignar responsable
+                            # "user_id": order.user_id.id,
+                        }
+                        task = Task.create(vals)
+
+                    cache_task_by_group[group] = task
+
+                # Asignar la tarea encontrada/creada a la línea
+                line.task_id = task.id
+
+        return True
